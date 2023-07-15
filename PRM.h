@@ -13,4 +13,4 @@ typedef struct GPS_data{
 
 void gaussJordanElimination(int32_t matrix[3][4]);
 
-coord_t PRM(GPS_data_t A, GPS_data_t B, GPS_data_t C, GPS_data_t D);
+void PRM(GPS_data_t A, GPS_data_t B, GPS_data_t C, GPS_data_t D);
