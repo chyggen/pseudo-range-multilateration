@@ -1,6 +1,7 @@
 #include "PRM.h"
+#include "stdio.h"
 
-void gaussJordanElimination(float matrix[3][4]) {
+void gaussJordanElimination(int32_t matrix[3][4]) {
     int i, j, k;
     float temp;
 
