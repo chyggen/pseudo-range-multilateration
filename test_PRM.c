@@ -1,15 +1,15 @@
 #include "PRM.h"
 #include <stdio.h>
 
-void setCoord(coord_t satellite, int32_t X, int32_t Y, int32_t Z){
-    satellite.x = X;
-    satellite.y = Y;
-    satellite.z = Z;
+void setCoord(coord_t* coord, int32_t X, int32_t Y, int32_t Z){
+    coord->x = X;
+    coord->y = Y;
+    coord->z = Z;
 }
 
-void getGPSData(GPS_data_t satellite, coord_t coords, uint32_t distance){
-    satellite.coord = coords;
-    satellite.time = distance; 
+void getGPSData(GPS_data_t* satellite, coord_t coords, uint32_t time){
+    setCoord(&(satellite->coord), coords.x, coords.y, coords.z);
+    satellite->time = time; 
 }
 
 int main(){
@@ -25,18 +25,18 @@ C - lat: 38.24680 long: -72.13579 dis: 4.8km, D - lat: 42.86420 long: -80.12345 
 via chatGPT*/
 
 //after converting to cartesian via an online calculator
-    setCoord(a_coords, -5062764.806, 7198517.764, 20200);
-    setCoord(b_coords, -5949130.852, 7344674.820, 20200);
-    setCoord(c_coords, -5042821.622, 6679893.159, 20200);
-    setCoord(d_coords, -4955695.349, 7859218.062, 20200);
+    setCoord(&a_coords, -5062764.806, 7198517.764, 20200);
+    setCoord(&b_coords, -5949130.852, 7344674.820, 20200);
+    setCoord(&c_coords, -5042821.622, 6679893.159, 20200);
+    setCoord(&d_coords, -4955695.349, 7859218.062, 20200);
 
-    getGPSData(a_satellite, a_coords, 5);
-    getGPSData(b_satellite, b_coords, 4.5);
-    getGPSData(c_satellite, c_coords, 4.8);
-    getGPSData(d_satellite, d_coords, 5.2);
+    getGPSData(&a_satellite, a_coords, 5);
+    getGPSData(&b_satellite, b_coords, 4.5);
+    getGPSData(&c_satellite, c_coords, 4.8);
+    getGPSData(&d_satellite, d_coords, 5.2);
 
     
-    PRM(emitter_coords, a_satellite, b_satellite, c_satellite, d_satellite);
+    PRM(&emitter_coords, a_satellite, b_satellite, c_satellite, d_satellite);
 
     return 0;
 }

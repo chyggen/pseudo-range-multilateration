@@ -31,13 +31,12 @@ void gaussJordanElimination(int32_t matrix[3][4]) {
 }
 
 
-void PRM(coord_t emitter_coords, GPS_data_t A, GPS_data_t B, GPS_data_t C, GPS_data_t D){
+void PRM(coord_t* emitter_coords, GPS_data_t A, GPS_data_t B, GPS_data_t C, GPS_data_t D){
     
     //do stuff
-    emitter_coords.x = 0;
-    emitter_coords.y = 0;
-    emitter_coords.z = 0;
-    
-    return emitter_coords;
+    emitter_coords->x = 0;
+    emitter_coords->y = 0;
+    emitter_coords->z = 0;
+
 }
 
