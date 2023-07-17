@@ -72,7 +72,7 @@ for time in travel_times:
 print("\ncopy below into test file to initialize fixed point structures with this dataset:\n")
 
 #distance is a signed value, only have 31 bits range
-FIXED_POINT_DISTANCE_FACTOR = 2**31 / EARTH_RADIUS
+FIXED_POINT_DISTANCE_FACTOR = 2**31 / GPS_SAT_RADIUS
 
 #get satellites fixed point coords
 for sat, char in zip(satellites, ["a","b","c","d"]):
