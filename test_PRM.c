@@ -1,5 +1,15 @@
-#include "PRM.h"
 #include <stdio.h>
+#include <time.h>
+
+#include "PRM.h"
+
+
+//comment this line to disable benchmarking within the PRM algorithm
+#define PRM_BENCHMARKING 
+
+#ifdef PRM_BENCHMARKING
+#define PRM_NUM_TIMESTAMPS 64 //TODO: figure out how many timestamps are needed
+#endif
 
 void setCoord(coord_t* coord, int32_t X, int32_t Y, int32_t Z){
     coord->x = X;
@@ -35,8 +45,51 @@ via chatGPT*/
     getGPSData(&c_satellite, c_coords, 4.8);
     getGPSData(&d_satellite, d_coords, 5.2);
 
+    #ifdef PRM_BENCHMARKING
+
+        //initialize timestamp array for benchmarking
+        clock_t timestamps[PRM_NUM_TIMESTAMPS] = {0}; 
+        printf("*Benchmarking enabled*\n\n");
+
+    #else 
+
+        //initialize timestamp array for benchmarking
+        clock_t* timestamps = NULL; 
+        printf("*Benchmarking disabled*\n\n");
+
+    #endif
+
+    //set start time:
+    clock_t start_time = clock();
+
+    //run program
+    PRM(&emitter_coords, a_satellite, b_satellite, c_satellite, d_satellite, timestamps);
+
+    //set end time:
+    clock_t end_time = clock();
+
+    //display performance summary
+    clock_t PRM_runtime = end_time - start_time;
+    double PRM_runtime_ms = (double)PRM_runtime * 1000 / CLOCKS_PER_SEC;
+    printf("PRM complete in %f milliseconds\n", PRM_runtime_ms);
+
+    #ifdef PRM_BENCHMARKING
+
+        int i;
+        for (i = 0; (i < PRM_NUM_TIMESTAMPS) && (timestamps[i] != 0); i++)
+        {
+            clock_t timestamp_offset = timestamps[i] - start_time;
+            double timestamp_offset_ms = (double)timestamp_offset * 1000 / CLOCKS_PER_SEC;
+            printf("timestamp %d: %f milliseconds\n",i ,timestamp_offset_ms);
+        }
     
-    PRM(&emitter_coords, a_satellite, b_satellite, c_satellite, d_satellite);
+    #endif
+
+
+
+
+
+
 
     return 0;
 }
