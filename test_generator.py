@@ -77,11 +77,11 @@ FIXED_POINT_DISTANCE_FACTOR = 2**31 / EARTH_RADIUS
 #get satellites fixed point coords
 for sat, char in zip(satellites, ["a","b","c","d"]):
     f_dist = [int(i * FIXED_POINT_DISTANCE_FACTOR) for i in sat]
-    print("setCoord(&" + char + "_coords, " + str(f_dist[0]) + ", " + str(f_dist[1]) + ", " + str(f_dist[2]) + ")")
+    print("\tsetCoord(&" + char + "_coords, " + str(f_dist[0]) + ", " + str(f_dist[1]) + ", " + str(f_dist[2]) + ");")
 
 #get emitter fixed point coords 
 em_f_dist = [int(i * FIXED_POINT_DISTANCE_FACTOR) for i in emitter]
-print("setCoord(&emitter_true_coords, " + str(em_f_dist[0]) + ", " + str(em_f_dist[1]) + ", " + str(em_f_dist[2]) + ")\n")
+print("\tsetCoord(&emitter_true_coords, " + str(em_f_dist[0]) + ", " + str(em_f_dist[1]) + ", " + str(em_f_dist[2]) + ");\n")
 
 #time is an unsigned value, full 32 bit range
 FIXED_POINT_TIME_FACTOR = 2**32 / 0.1
@@ -89,7 +89,7 @@ FIXED_POINT_TIME_FACTOR = 2**32 / 0.1
 #get full sattelite structure in fixed point values, including distance
 for time, char in zip(travel_times, ["a","b","c","d"]):
     f_time = int(time * FIXED_POINT_TIME_FACTOR)
-    print("getGPSData(&" + char + "_satellite, " + char + "_coords, " + str(f_time) + ")")
+    print("\tgetGPSData(&" + char + "_satellite, " + char + "_coords, " + str(f_time) + ");")
 
 print("\n")
 
