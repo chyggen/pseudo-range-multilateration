@@ -45,6 +45,8 @@ satellites (A,B,C,D).  */
     getGPSData(&c_satellite, c_coords, 2407913067);
     getGPSData(&d_satellite, d_coords, 2305509064);
 
+// end of test data
+
     #ifdef PRM_BENCHMARKING
 
         //initialize timestamp array for benchmarking
@@ -53,7 +55,7 @@ satellites (A,B,C,D).  */
 
     #else 
 
-        //initialize timestamp array for benchmarking
+        //create dummy timestamp array
         clock_t* timestamps = NULL; 
         printf("*Benchmarking disabled*\n\n");
 
@@ -80,7 +82,7 @@ satellites (A,B,C,D).  */
         {
             clock_t timestamp_offset = timestamps[i] - start_time;
             double timestamp_offset_ms = (double)timestamp_offset * 1000 / CLOCKS_PER_SEC;
-            printf("timestamp %d: %f milliseconds\n",i ,timestamp_offset_ms);
+            printf("benchmark timestamp %d: %f milliseconds\n",i ,timestamp_offset_ms);
         }
     
     #endif
