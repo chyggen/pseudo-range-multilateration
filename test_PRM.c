@@ -88,6 +88,9 @@ satellites (A,B,C,D).  */
     #endif
 
     //display calculation errors
+    printf("\t x: %d\n", emitter_PRM_coords.x);
+    printf("\t x: %d\n", emitter_PRM_coords.y);
+    printf("\t x: %d\n", emitter_PRM_coords.z);
     printf("\nEmitter coords absolute error: \n\n");
     printf("\t x: %d\n", emitter_PRM_coords.x - emitter_true_coords.x);
     printf("\t y: %d\n", emitter_PRM_coords.y - emitter_true_coords.y);
