@@ -12,6 +12,6 @@ typedef struct GPS_data{
 	uint32_t time;
 }GPS_data_t;
 
-void gaussJordanElimination(int32_t matrix[3][4], clock_t* timestamps);
+void gaussianElimination(int32_t matrix[3][3], int64_t augments[], clock_t* timestamps);
 
-void PRM(coord_t* emitter_coords, GPS_data_t A, GPS_data_t B, GPS_data_t C, GPS_data_t D, clock_t* timestamps);
+void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps);
