@@ -26,7 +26,7 @@ scale_factor = EARTH_RADIUS / vec_magnitude
 #get a point on earth's surface:
 emitter = [i * scale_factor for i in emitter_vec]
 
-print("the emmitter is at: \n" + str(emitter))
+print("\nthe emmitter is at: \n" + str(emitter))
 
 #get 4 more random vectors in the first octant
 satellite_vecs = [[r.random() for _ in range(3)] for _ in range(4)]
@@ -50,7 +50,7 @@ for vec in satellite_vecs:
     #add scaled vector to list of satellites
     satellites.append([i * scale_factor for i in vec])
 
-print("the sattelites are at: ")
+print("\nthe sattelites are at: ")
 for sat in satellites:
     print(sat)
 
@@ -64,32 +64,41 @@ for sat in satellites:
     total_dist = math.sqrt(x_dist*x_dist + y_dist*y_dist + z_dist*z_dist)
     travel_times.append(total_dist/LIGHT_SPEED)
     
-print("the travel times are: ")
+print("\nthe travel times are: ")
 for time in travel_times:
     print(str(time) + "s")
+
+
+#calculate scale factors
+#distance is a signed value, only have 31 bits range
+FIXED_POINT_DISTANCE_FACTOR = int(2**31 / GPS_SAT_RADIUS)
+
+#time is an unsigned value, full 32 bit range
+FIXED_POINT_TIME_FACTOR = int(2**16 / 0.1)
+
+#print scale factors
+print("\nFIXED_POINT_DISTANCE_FACTOR:")
+print(FIXED_POINT_DISTANCE_FACTOR)
+print("FIXED_POINT_TIME_FACTOR:")
+print(FIXED_POINT_TIME_FACTOR)
 
 #generate fixed point values for use in test_PRM.c
 print("\ncopy below into test file to initialize fixed point structures with this dataset:\n")
 
-#distance is a signed value, only have 31 bits range
-FIXED_POINT_DISTANCE_FACTOR = 2**31 / GPS_SAT_RADIUS
-
 #get satellites fixed point coords
-for sat, char in zip(satellites, ["a","b","c","d"]):
+for sat, num in zip(satellites, range(4)):
     f_dist = [int(i * FIXED_POINT_DISTANCE_FACTOR) for i in sat]
-    print("\tsetCoord(&" + char + "_coords, " + str(f_dist[0]) + ", " + str(f_dist[1]) + ", " + str(f_dist[2]) + ");")
+    print("\tsetCoord(&sat_coords[" + str(num) + "], " + str(f_dist[0]) + ", " + str(f_dist[1]) + ", " + str(f_dist[2]) + ");")
 
 #get emitter fixed point coords 
 em_f_dist = [int(i * FIXED_POINT_DISTANCE_FACTOR) for i in emitter]
 print("\tsetCoord(&emitter_true_coords, " + str(em_f_dist[0]) + ", " + str(em_f_dist[1]) + ", " + str(em_f_dist[2]) + ");\n")
 
-#time is an unsigned value, full 32 bit range
-FIXED_POINT_TIME_FACTOR = 2**32 / 0.1
 
 #get full sattelite structure in fixed point values, including distance
-for time, char in zip(travel_times, ["a","b","c","d"]):
+for time, num in zip(travel_times, range(4)):
     f_time = int(time * FIXED_POINT_TIME_FACTOR)
-    print("\tgetGPSData(&" + char + "_satellite, " + char + "_coords, " + str(f_time) + ");")
+    print("\tgetGPSData(&sats[" + str(num) + "], sat_coords[" + str(num) + "], " + str(f_time) + ");")
 
 print("\n")
 
