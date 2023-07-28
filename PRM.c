@@ -4,6 +4,25 @@
 #define LIGHT_SPEED                 300000000
 #define FIXED_POINT_DISTANCE_FACTOR 106
 #define FIXED_POINT_TIME_FACTOR     655360
+#define EARTH_RADIUS                6371000 
+
+double sqrt(double num) {
+    if (num < 0) {
+        // Square root of a negative number is undefined
+        return -1.0;
+    }
+
+    // Initial guess
+    double x = num;
+
+    // Newton-Raphson method to approximate the square root
+    const int iterations = 10; // You can adjust the number of iterations for better accuracy
+    for (int i = 0; i < iterations; i++) {
+        x = 0.5 * (x + num / x);
+    }
+
+    return x;
+}
 
 void gaussianElimination(int32_t matrix[3][3], int64_t augments[], clock_t* timestamps) {
 
@@ -104,6 +123,20 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
     emitter_coords->x = -(int32_t)(augments[0] / M[0][0]); 
     emitter_coords->y = -(int32_t)(augments[1] / M[1][1]);
     emitter_coords->z = -(int32_t)(augments[2] / M[2][2]);
+
+    // Scale the emmitter coords to a point on the surface of the earth
+    float multiplier = sqrt( 
+        (int64_t)EARTH_RADIUS * EARTH_RADIUS * 106 * 106 /
+        ((int64_t)emitter_coords->x * emitter_coords->x +
+        (int64_t)emitter_coords->y * emitter_coords->y +
+        (int64_t)emitter_coords->z * emitter_coords->z)
+    );
+
+    printf("%f\n", multiplier);
+
+    emitter_coords->x = (int32_t)(emitter_coords->x * multiplier);
+    emitter_coords->y = (int32_t)(emitter_coords->y * multiplier);
+    emitter_coords->z = (int32_t)(emitter_coords->z * multiplier);
 
     printf("-%ld / %d = %ld \n", (augments[0]), (M[0][0]), -(augments[0] / (int64_t)M[0][0]));
 }
