@@ -75,7 +75,7 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
         int64_t denom_i = (int64_t)(sats[sat_idx].time) * 2;
         int64_t denom_1 = (int64_t)(sats[0].time) * 2;
         
-        printf("denoms: %ld %ld\n", denom_1, denom_i);
+        //printf("denoms: %ld %ld\n", denom_1, denom_i);
 
         int64_t term1 = ((int64_t) LIGHT_SPEED * LIGHT_SPEED / 
             ((int64_t) FIXED_POINT_TIME_FACTOR * FIXED_POINT_TIME_FACTOR* 2)) *
@@ -91,12 +91,12 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
             FIXED_POINT_DISTANCE_FACTOR;
             
 
-        printf("term 1: %ld\nterm 2: %ld\n", term1, term2);
+        //printf("term 1: %ld\nterm 2: %ld\n", term1, term2);
 
         augments[row] = term1 + term2;
     }
 
-    printf("pre gaussian:\n");
+    /*printf("pre gaussian:\n");
     int i,j;
 
     for (i = 0; i < 3; ++i)
@@ -106,11 +106,11 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
             printf("%10d ", M[i][j]);
         }
         printf("%20ld\n", augments[i]);
-    }
+    }*/
 
     gaussianElimination(M, augments, timestamps);
 
-    printf("post gaussian:\n");
+    /*printf("post gaussian:\n");
     for (i = 0; i < 3; ++i)
     {
         for(j = 0; j < 3; j++)
@@ -118,7 +118,7 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
             printf("%10d ", M[i][j]);
         }
         printf("%20ld\n", augments[i]);
-    }
+    }*/
 
     emitter_coords->x = -(int32_t)(augments[0] / M[0][0]); 
     emitter_coords->y = -(int32_t)(augments[1] / M[1][1]);
@@ -132,12 +132,12 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
         (int64_t)emitter_coords->z * emitter_coords->z)
     );
 
-    printf("%f\n", multiplier);
+    //printf("%f\n", multiplier);
 
     emitter_coords->x = (int32_t)(emitter_coords->x * multiplier);
     emitter_coords->y = (int32_t)(emitter_coords->y * multiplier);
     emitter_coords->z = (int32_t)(emitter_coords->z * multiplier);
 
-    printf("-%ld / %d = %ld \n", (augments[0]), (M[0][0]), -(augments[0] / (int64_t)M[0][0]));
+    //printf("-%ld / %d = %ld \n", (augments[0]), (M[0][0]), -(augments[0] / (int64_t)M[0][0]));
 }
 
