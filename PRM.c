@@ -5,6 +5,7 @@
 #define FIXED_POINT_DISTANCE_FACTOR 106
 #define FIXED_POINT_TIME_FACTOR     655360
 #define EARTH_RADIUS                6371000 
+#define PRM_NUM_TIMESTAMPS          64
 
 double sqrt(double num) {
     if (num < 0) {
@@ -17,7 +18,8 @@ double sqrt(double num) {
 
     // Newton-Raphson method to approximate the square root
     const int iterations = 10; // You can adjust the number of iterations for better accuracy
-    for (int i = 0; i < iterations; i++) {
+    int i;
+    for (i = 0; i < iterations; i++) {
         x = 0.5 * (x + num / x);
     }
 
@@ -52,8 +54,18 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
         multiplied A,B,C by LIGHT_SPEED * FIXED_POINT_DISTANCE_FACTOR/2 
     */
 
-   int32_t M[3][3];
-   int64_t augments[3];
+    // Counter to track  timestamps
+    int timestamp_count = 0;
+
+    if(timestamp_count < PRM_NUM_TIMESTAMPS){
+        timestamps[timestamp_count] = clock();
+        printf("Start of PRM function: %f\n", timestamps[timestamp_count]);
+        printf("~~~\n\n");
+        timestamp_count++;
+    }
+    
+    int32_t M[3][3];
+    int64_t augments[3];
     
     int row;
     for (row = 0; row < 3; ++row)
@@ -108,7 +120,20 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
         printf("%20ld\n", augments[i]);
     }*/
 
+    if(timestamp_count < PRM_NUM_TIMESTAMPS){
+        timestamps[timestamp_count] = clock();
+        printf("    Timestamp before Gaussian: %f\n", timestamps[timestamp_count]);
+        printf("    ~~~\n");
+        timestamp_count++;
+    }
+
     gaussianElimination(M, augments, timestamps);
+
+    if(timestamp_count < PRM_NUM_TIMESTAMPS){
+        timestamps[timestamp_count] = clock();
+        printf("    Timestamp after Gaussian: %f\n\n", timestamps[timestamp_count]);
+        timestamp_count++;
+    }
 
     /*printf("post gaussian:\n");
     for (i = 0; i < 3; ++i)
@@ -124,8 +149,15 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
     emitter_coords->y = -(int32_t)(augments[1] / M[1][1]);
     emitter_coords->z = -(int32_t)(augments[2] / M[2][2]);
 
+    if(timestamp_count < PRM_NUM_TIMESTAMPS){
+        timestamps[timestamp_count] = clock();
+        printf("    Timestamp before scaling calculated emitter coords to the earth surface: %f\n", timestamps[timestamp_count]);
+        printf("    ~~~\n");
+        timestamp_count++;
+    }
+
     // Scale the emmitter coords to a point on the surface of the earth
-    float multiplier = sqrt( 
+    int64_t multiplier = sqrt( 
         (int64_t)EARTH_RADIUS * EARTH_RADIUS * 106 * 106 /
         ((int64_t)emitter_coords->x * emitter_coords->x +
         (int64_t)emitter_coords->y * emitter_coords->y +
@@ -137,6 +169,18 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, clock_t* timestamps){
     emitter_coords->x = (int32_t)(emitter_coords->x * multiplier);
     emitter_coords->y = (int32_t)(emitter_coords->y * multiplier);
     emitter_coords->z = (int32_t)(emitter_coords->z * multiplier);
+
+    if(timestamp_count < PRM_NUM_TIMESTAMPS){
+        timestamps[timestamp_count] = clock();
+        printf("    Timestamp after scaling calculated emitter coords to the earth surface: %f\n\n", timestamps[timestamp_count]);
+        timestamp_count++;
+    }
+
+    if(timestamp_count < PRM_NUM_TIMESTAMPS){
+        timestamps[timestamp_count] = clock();
+        printf("Timestamp End of PRM: %f\n\n", timestamps[timestamp_count]);
+        timestamp_count++;
+    }
 
     //printf("-%ld / %d = %ld \n", (augments[0]), (M[0][0]), -(augments[0] / (int64_t)M[0][0]));
 }
