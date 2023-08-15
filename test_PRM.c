@@ -119,18 +119,18 @@ int satellite_id[5*total_tests];
 
         //display performance summary
         long PRM_runtime = end.tv_nsec - start.tv_nsec;
-        printf("PRM complete in %d nanoseconds\n", PRM_runtime);
-
         #ifdef PRM_BENCHMARKING
             int j;
+            printf("benchmark timestamps:\n");
             for (j = 0; (j < PRM_NUM_TIMESTAMPS) && (timestamps[j].tv_nsec != 0); j++)
             {
                 clock_t timestamp_offset = timestamps[j].tv_nsec - start.tv_nsec;
-                printf("benchmark timestamp %d: %d nanoseconds\n", j, timestamp_offset);
+                printf("%d\n", timestamp_offset);
             }
-            printf("benchmark timestamp %d was 0", j);
-        
+            // printf("benchmark timestamp %d was 0", j);        
         #endif
+
+        printf("PRM complete in %d nanoseconds\n", PRM_runtime);
 
         //display calculation errors
 
