@@ -70,46 +70,67 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     int32_t M[3][3];
     int64_t augments[3];
         
-    int row;
-    for (row = 0; row < 3; ++row)
-    {
-        int sat_idx = row + 1;
+    // optimization attempt: unroll loop to fill M matrix and augments vector
+ 
+       
+        // save reused terms so they dont have to be calculated more than once
+        int32_t A_sat0_term = sats[0].coord.x / (sats[0].time);
+        int32_t B_sat0_term = sats[0].coord.y / (sats[0].time);
+        int32_t C_sat0_term = sats[0].coord.z / (sats[0].time);
+        int64_t D_sat0_term2 = ((((int64_t)sats[0].coord.x * sats[0].coord.x) >> 2) +
+                                (((int64_t)sats[0].coord.y * sats[0].coord.y) >> 2) +
+                                (((int64_t)sats[0].coord.z * sats[0].coord.z) >> 2)) 
+                                / ((int64_t)(sats[0].time) << 1);
 
         // calculation of Ai, Bi, Ci constants involves division by a non constant, so we are 
         // not trying operator strength reduction
-        M[row][0] = 
-            sats[sat_idx].coord.x / (sats[sat_idx].time) - 
-            sats[0].coord.x / (sats[0].time);
+        M[0][0] = sats[1].coord.x / (sats[1].time) - A_sat0_term;
+        M[1][0] = sats[2].coord.x / (sats[2].time) - A_sat0_term;
+        M[2][0] = sats[3].coord.x / (sats[3].time) - A_sat0_term;
 
-        M[row][1] = 
-            sats[sat_idx].coord.y / (sats[sat_idx].time) - 
-            sats[0].coord.y / (sats[0].time);
+        M[0][1] = sats[1].coord.y / (sats[1].time) - B_sat0_term;
+        M[1][1] = sats[2].coord.y / (sats[2].time) - B_sat0_term;
+        M[2][1] = sats[3].coord.y / (sats[3].time) - B_sat0_term;
             
-        M[row][2] = 
-            sats[sat_idx].coord.z / (sats[sat_idx].time) - 
-            sats[0].coord.z / (sats[0].time);
+        M[0][2] = sats[1].coord.z / (sats[1].time) - C_sat0_term;
+        M[1][2] = sats[2].coord.z / (sats[2].time) - C_sat0_term;
+        M[2][2] = sats[3].coord.z / (sats[3].time) - C_sat0_term;
 
-        // apply operator strength reduction by using shifts
-        int64_t denom_i = (int64_t)(sats[sat_idx].time) << 1;
-        int64_t denom_1 = (int64_t)(sats[0].time) << 1;
+        // optimization attempt: apply operator strength reduction by using shifts
+        int64_t denom_1 = (int64_t)(sats[1].time) << 1;
+        int64_t denom_2 = (int64_t)(sats[2].time) << 1;
+        int64_t denom_3 = (int64_t)(sats[3].time) << 1;
 
-        // optimization attempt: pre-calculate coeficient 
-        int64_t term1 = TERM1_CONST * ((int64_t)sats[sat_idx].time - sats[0].time);
+        // optimization attempt: use pre-calculated term 1 coeficient (TERM1_CONST)
+        int64_t D0_term1 = TERM1_CONST * ((int64_t)sats[1].time - sats[0].time);
+        int64_t D1_term1 = TERM1_CONST * ((int64_t)sats[2].time - sats[0].time);
+        int64_t D2_term1 = TERM1_CONST * ((int64_t)sats[3].time - sats[0].time);
 
         // optimization attempt: remove 4 divisions in term 2 calculation by grouping x,y,z in single numerator.
         // This will cut the precision of the numerator in 4 since we need to right shift 
         // coordinates so that overflow doesnt occur, but this shouldnt be noticeable. Additionally, 
         // we remove the division by FIXED_POINT_DISTANCE_FACTOR and apply operator strength 
         // reduction by replacing it with a multiplication and right shift
-        int64_t term2 =
-            ((  (((int64_t)sats[0].coord.x * sats[0].coord.x) >> 2) +
-                (((int64_t)sats[0].coord.y * sats[0].coord.y) >> 2) +
-                (((int64_t)sats[0].coord.z * sats[0].coord.z) >> 2)) 
-                / denom_1 -
-            (   (((int64_t)sats[sat_idx].coord.x * sats[sat_idx].coord.x) >> 2) +
-                (((int64_t)sats[sat_idx].coord.y * sats[sat_idx].coord.y) >> 2) +
-                (((int64_t)sats[sat_idx].coord.z * sats[sat_idx].coord.z) >> 2))
-                / denom_i );
+        int64_t D0_term2 =
+                D_sat0_term2 - ((
+                (((int64_t)sats[1].coord.x * sats[1].coord.x) >> 2) +
+                (((int64_t)sats[1].coord.y * sats[1].coord.y) >> 2) +
+                (((int64_t)sats[1].coord.z * sats[1].coord.z) >> 2))
+                / denom_1 );
+
+        int64_t D1_term2 =
+                D_sat0_term2 - ((
+                (((int64_t)sats[2].coord.x * sats[2].coord.x) >> 2) +
+                (((int64_t)sats[2].coord.y * sats[2].coord.y) >> 2) +
+                (((int64_t)sats[2].coord.z * sats[2].coord.z) >> 2))
+                / denom_2 );
+
+        int64_t D2_term2 =
+                D_sat0_term2 - ((
+                (((int64_t)sats[3].coord.x * sats[3].coord.x) >> 2) +
+                (((int64_t)sats[3].coord.y * sats[3].coord.y) >> 2) +
+                (((int64_t)sats[3].coord.z * sats[3].coord.z) >> 2))
+                / denom_3 );
 
         // compensate for shifting and removing division by FIXED_POINT_DISTANCE_FACTOR:
         // we left shifted all the numerators in term 2 by 2 and removed a division by 106.
@@ -118,22 +139,26 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
         // contain numbers which should be at the very least 31,348 (15 bits). Therefore, we
         // can safely multiply by a 14 bit number without causing overflow. our best option is 
         // to multiply by 9892 (14 bits) then right shift by 18
-        term2 = (term2 * 9892) >> 18;
 
-        augments[row] = term1 + term2;
-    }
+        D0_term2 = (D0_term2 * 9892) >> 18;
+        D1_term2 = (D1_term2 * 9892) >> 18;
+        D2_term2 = (D2_term2 * 9892) >> 18;
 
-    /*printf("pre gaussian:\n");
-    int i,j;
+        augments[0] = D0_term1 + D0_term2;
+        augments[1] = D1_term1 + D1_term2;
+        augments[2] = D2_term1 + D2_term2;    
 
-    for (i = 0; i < 3; ++i)
-    {
-        for(j = 0; j < 3; j++)
-        {
-            printf("%10d ", M[i][j]);
-        }
-        printf("%20ld\n", augments[i]);
-    }*/
+    // printf("pre gaussian:\n");
+    // int i,j;
+
+    // for (i = 0; i < 3; ++i)
+    // {
+    //     for(j = 0; j < 3; j++)
+    //     {
+    //         printf("%10d ", M[i][j]);
+    //     }
+    //     printf("%20ld\n", augments[i]);
+    // }
 
     #ifdef PRM_BENCHMARKING
         // timestamp index 1
