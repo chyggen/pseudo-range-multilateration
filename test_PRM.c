@@ -1,15 +1,11 @@
 #include <stdio.h>
 #include <time.h>
 #include <string.h>
-
+#include <assert.h>
 #include "PRM.h"
 
 //match this number with the number of tests wanting to be done/generated
 #define total_tests 10
-
-
-//comment this line to disable benchmarking within the PRM algorithm
-#define PRM_BENCHMARKING 
 
 #ifdef PRM_BENCHMARKING
 #define PRM_NUM_TIMESTAMPS 64 //TODO: figure out how many timestamps are needed
@@ -66,7 +62,7 @@ int satellite_id[5*total_tests];
 
     // Scan in data from file, format of the generated data is: "satellite_id X Y Z time"
         //int X_gen[total_tests], Y_gen[total_tests], Z_gen[total_tests], time_gen[total_tests];
-        sscanf(line, "%d %d %d %d %d", &satellite_id[i], &X_gen[i], &Y_gen[i], &Z_gen[i], &time_gen[i]);
+        assert(sscanf(line, "%d %d %d %d %d", &satellite_id[i], &X_gen[i], &Y_gen[i], &Z_gen[i], &time_gen[i]) == 5);
 
         /*
         printf("\n");
@@ -94,44 +90,45 @@ int satellite_id[5*total_tests];
         getGPSData(&sats[0], sat_coords[0], time_gen[test_num_tracker]);
         getGPSData(&sats[1], sat_coords[1], time_gen[test_num_tracker + 1]);
         getGPSData(&sats[2], sat_coords[2], time_gen[test_num_tracker + 2]);
-        getGPSData(&sats[3], sat_coords[3], time_gen[test_num_tracker] + 3);
+        getGPSData(&sats[3], sat_coords[3], time_gen[test_num_tracker + 3]);
 
     // end of test data
 
         #ifdef PRM_BENCHMARKING
 
             //initialize timestamp array for benchmarking
-            clock_t timestamps[PRM_NUM_TIMESTAMPS] = {0}; 
+            struct timespec timestamps[PRM_NUM_TIMESTAMPS] = {0}; 
             printf("\n*Benchmarking enabled*\n\n");
 
         #else 
 
             //create dummy timestamp array
-            clock_t* timestamps = NULL; 
+            struct timespec* timestamps = NULL; 
             printf("*Benchmarking disabled*\n\n");
 
         #endif
 
+        struct timespec start, end;
+
         //set start time:
-        clock_t start_time = clock();
+        clock_gettime(CLOCK_MONOTONIC, &start);
         //run program
         PRM(&emitter_PRM_coords, sats, timestamps);
         //set end time:
-        clock_t end_time = clock();
+        clock_gettime(CLOCK_MONOTONIC, &end);
 
         //display performance summary
-        clock_t PRM_runtime = end_time - start_time;
-        double PRM_runtime_ms = (double)PRM_runtime * 1000 / CLOCKS_PER_SEC;
-        printf("PRM complete in %f milliseconds\n", PRM_runtime_ms);
+        long PRM_runtime = end.tv_nsec - start.tv_nsec;
+        printf("PRM complete in %d nanoseconds\n", PRM_runtime);
 
         #ifdef PRM_BENCHMARKING
             int j;
-            for (j = 0; (j < PRM_NUM_TIMESTAMPS) && (timestamps[j] != 0); j++)
+            for (j = 0; (j < PRM_NUM_TIMESTAMPS) && (timestamps[j].tv_nsec != 0); j++)
             {
-                clock_t timestamp_offset = timestamps[j] - start_time;
-                double timestamp_offset_ms = (double)timestamp_offset * 1000 / CLOCKS_PER_SEC;
-                printf("benchmark timestamp %d: %f milliseconds\n",j ,timestamp_offset_ms);
+                clock_t timestamp_offset = timestamps[j].tv_nsec - start.tv_nsec;
+                printf("benchmark timestamp %d: %d nanoseconds\n", j, timestamp_offset);
             }
+            printf("benchmark timestamp %d was 0", j);
         
         #endif
 
@@ -154,6 +151,6 @@ int satellite_id[5*total_tests];
 
     }
     //fclose(file);
-    printf("\n--------------END--------------");
+    printf("\n--------------END--------------\n");
     return 0;
 }
