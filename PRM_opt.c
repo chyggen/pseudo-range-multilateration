@@ -30,20 +30,51 @@ double sqrt(double num) {
 
 void gaussianElimination(int32_t matrix[3][3], int64_t augments[], struct timespec* timestamps) {
 
-    int i, j, k;
+    // optimization attempt: fully unroll gaussian elim loops
+    int64_t ratio;
 
-    for (i = 0; i < 3; i++) {
-        for (j = 0; j < 3; j++) {
-            if (i != j) {
-                
-                int64_t ratio = ((int64_t)matrix[j][i] << 32) / matrix[i][i];
-                for (k = 0; k < 3; k++) {
-                    matrix[j][k] -= ((ratio >> 16) * matrix[i][k]) >> 16;
-                }
-                augments[j] -= ((ratio >> 16) * augments[i])>> 16;
-            }
-        }
-    }
+    // use row 0 to eliminate first element of row 1
+    ratio = ((int64_t)matrix[1][0] << 16) / matrix[0][0];
+    matrix[1][0] = 0; // no reason to calculate since will be ignored if non-zero
+    matrix[1][1] -= (ratio * matrix[0][1]) >> 16;
+    matrix[1][2] -= (ratio * matrix[0][2]) >> 16;
+    augments[1]  -= (ratio * augments[0])  >> 16;
+
+    // use row 0 to eliminate first element of row 2
+    ratio = ((int64_t)matrix[2][0] << 16) / matrix[0][0];
+    matrix[2][0] = 0; // no reason to calculate since will be ignored if non-zero
+    matrix[2][1] -= (ratio * matrix[0][1]) >> 16;
+    matrix[2][2] -= (ratio * matrix[0][2]) >> 16;
+    augments[2]  -= (ratio * augments[0])  >> 16;
+
+    // use row 1 to eliminate second element of row 0
+    ratio = ((int64_t)matrix[0][1] << 16) / matrix[1][1];
+ // matrix[0][0] will not be changed by row reduction because matrix[1][0] has been set to 0
+    matrix[0][1] = 0; // no reason to calculate since will be ignored if non-zero
+    matrix[0][2] -= (ratio * matrix[1][2]) >> 16;
+    augments[0]  -= (ratio * augments[1])  >> 16;
+
+    // use row 1 to eliminate second element of row 2
+    ratio = ((int64_t)matrix[2][1] << 16) / matrix[1][1];
+ // matrix[0][0] will not be changed by row reduction because matrix[2][0] has been set to 0
+    matrix[0][1] = 0; // no reason to calculate since will be ignored if non-zero
+    matrix[2][2] -= (ratio * matrix[1][2]) >> 16;
+    augments[2]  -= (ratio * augments[1])  >> 16;
+    
+    // for the last two steps, there is no reason to do anything but modify the augments.
+    // this will leave the matrix with non zero elemnts at [0][2] and [1][2], or in the form:
+    // a 0 c 
+    // 0 e f
+    // 0 0 i
+    // but this is ok since these elements will not be used for further row reductions,
+    // we only care about the elements [0][0], [1][1] and [2][2] as well as the augments.
+
+    // use row 2 to modify augments
+    ratio = ((int64_t)matrix[0][2] << 16) / matrix[2][2];
+    augments[0]  -= (ratio * augments[2])  >> 16;
+
+    ratio = ((int64_t)matrix[1][2] << 16) / matrix[2][2];
+    augments[1]  -= (ratio * augments[2])  >> 16;
 }
 
 
@@ -165,6 +196,8 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
         clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
         timestamp_count++;
     #endif
+
+    // STAGE 2: gaussian elimination 
 
     gaussianElimination(M, augments, timestamps);
 
