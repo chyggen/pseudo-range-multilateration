@@ -7,6 +7,7 @@
 #define FIXED_POINT_TIME_FACTOR     655360
 #define EARTH_RADIUS                6371000 
 #define PRM_NUM_TIMESTAMPS          64
+#define TERM1_CONST                 (int64_t)11106022
 
 double sqrt(double num) {
     if (num < 0) {
@@ -63,15 +64,19 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
         clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count) == 0;
         timestamp_count++;
     #endif
+
+    // STAGE 1: matrix construction 
     
     int32_t M[3][3];
     int64_t augments[3];
-    
+        
     int row;
     for (row = 0; row < 3; ++row)
     {
         int sat_idx = row + 1;
 
+        // calculation of Ai, Bi, Ci constants involves division by a non constant, so we are 
+        // not trying operator strength reduction
         M[row][0] = 
             sats[sat_idx].coord.x / (sats[sat_idx].time) - 
             sats[0].coord.x / (sats[0].time);
@@ -84,26 +89,36 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
             sats[sat_idx].coord.z / (sats[sat_idx].time) - 
             sats[0].coord.z / (sats[0].time);
 
-        int64_t denom_i = (int64_t)(sats[sat_idx].time) * 2;
-        int64_t denom_1 = (int64_t)(sats[0].time) * 2;
-        
-        //printf("denoms: %ld %ld\n", denom_1, denom_i);
+        // apply operator strength reduction by using shifts
+        int64_t denom_i = (int64_t)(sats[sat_idx].time) << 1;
+        int64_t denom_1 = (int64_t)(sats[0].time) << 1;
 
-        int64_t term1 = ((int64_t) LIGHT_SPEED * LIGHT_SPEED / 
-            ((int64_t) FIXED_POINT_TIME_FACTOR * FIXED_POINT_TIME_FACTOR* 2)) *
-            ((int64_t)sats[sat_idx].time - sats[0].time) * FIXED_POINT_DISTANCE_FACTOR;
+        // optimization attempt: pre-calculate coeficient 
+        int64_t term1 = TERM1_CONST * ((int64_t)sats[sat_idx].time - sats[0].time);
 
+        // optimization attempt: remove 4 divisions in term 2 calculation by grouping x,y,z in single numerator.
+        // This will cut the precision of the numerator in 4 since we need to right shift 
+        // coordinates so that overflow doesnt occur, but this shouldnt be noticeable. Additionally, 
+        // we remove the division by FIXED_POINT_DISTANCE_FACTOR and apply operator strength 
+        // reduction by replacing it with a multiplication and right shift
         int64_t term2 =
-            (((int64_t)sats[0].coord.x * sats[0].coord.x) / denom_1 +
-            ((int64_t)sats[0].coord.y * sats[0].coord.y) / denom_1 +
-            ((int64_t)sats[0].coord.z * sats[0].coord.z) / denom_1 -
-            ((int64_t)sats[sat_idx].coord.x * sats[sat_idx].coord.x) / denom_i -
-            ((int64_t)sats[sat_idx].coord.y * sats[sat_idx].coord.y) / denom_i -
-            ((int64_t)sats[sat_idx].coord.z * sats[sat_idx].coord.z) / denom_i) /
-            FIXED_POINT_DISTANCE_FACTOR;
-            
+            ((  (((int64_t)sats[0].coord.x * sats[0].coord.x) >> 2) +
+                (((int64_t)sats[0].coord.y * sats[0].coord.y) >> 2) +
+                (((int64_t)sats[0].coord.z * sats[0].coord.z) >> 2)) 
+                / denom_1 -
+            (   (((int64_t)sats[sat_idx].coord.x * sats[sat_idx].coord.x) >> 2) +
+                (((int64_t)sats[sat_idx].coord.y * sats[sat_idx].coord.y) >> 2) +
+                (((int64_t)sats[sat_idx].coord.z * sats[sat_idx].coord.z) >> 2))
+                / denom_i );
 
-        //printf("term 1: %ld\nterm 2: %ld\n", term1, term2);
+        // compensate for shifting and removing division by FIXED_POINT_DISTANCE_FACTOR:
+        // we left shifted all the numerators in term 2 by 2 and removed a division by 106.
+        // essentially, we need to divide by 106/4 = 26.5. The numerators in the previous 
+        // step contain numbers that could fill the entire 64 bit range, and the denominators 
+        // contain numbers which should be at the very least 31,348 (15 bits). Therefore, we
+        // can safely multiply by a 14 bit number without causing overflow. our best option is 
+        // to multiply by 9892 (14 bits) then right shift by 18
+        term2 = (term2 * 9892) >> 18;
 
         augments[row] = term1 + term2;
     }
