@@ -10,6 +10,15 @@
 #define PRM_NUM_TIMESTAMPS          64
 #define TERM1_CONST                 (int64_t)11106022
 
+
+void putTimestamp(struct timespec* timestamps, int* timestamp_count )
+{
+    #ifdef PRM_BENCHMARKING
+        clock_gettime(CLOCK_MONOTONIC, timestamps + *timestamp_count) == 0;
+        (*timestamp_count)++;
+    #endif
+}
+
 void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps){
 
     /*  Goal: want to apply scale factors to Ai, Bi, Ci, Di constants to not lose precision througout.
@@ -22,11 +31,8 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     // Counter to track timestamps
     int timestamp_count = 0;
 
-    #ifdef PRM_BENCHMARKING
-        // timestamp index 0
-        clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count) == 0;
-        timestamp_count++;
-    #endif
+    // timestamp index 0
+    putTimestamp(timestamps, &timestamp_count);
 
     // STAGE 1: matrix construction 
     
@@ -34,82 +40,99 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     int64_t augments[3];
         
     // optimization attempt: unroll loop to fill M matrix and augments vector
- 
        
-        // save reused terms so they dont have to be calculated more than once
-        int32_t A_sat0_term = sats[0].coord.x / (sats[0].time);
-        int32_t B_sat0_term = sats[0].coord.y / (sats[0].time);
-        int32_t C_sat0_term = sats[0].coord.z / (sats[0].time);
-        int64_t D_sat0_term2 = ((((int64_t)sats[0].coord.x * sats[0].coord.x) >> 2) +
-                                (((int64_t)sats[0].coord.y * sats[0].coord.y) >> 2) +
-                                (((int64_t)sats[0].coord.z * sats[0].coord.z) >> 2)) 
-                                / ((int64_t)(sats[0].time) << 1);
+    // save reused terms so they dont have to be calculated more than once
+    int32_t A_sat0_term = sats[0].coord.x / (sats[0].time);
+    int32_t B_sat0_term = sats[0].coord.y / (sats[0].time);
+    int32_t C_sat0_term = sats[0].coord.z / (sats[0].time);
 
-        // calculation of Ai, Bi, Ci constants involves division by a non constant, so we are 
-        // not trying operator strength reduction
-        M[0][0] = sats[1].coord.x / (sats[1].time) - A_sat0_term;
-        M[1][0] = sats[2].coord.x / (sats[2].time) - A_sat0_term;
-        M[2][0] = sats[3].coord.x / (sats[3].time) - A_sat0_term;
+    // timestamp index 1
+    putTimestamp(timestamps, &timestamp_count);
 
-        M[0][1] = sats[1].coord.y / (sats[1].time) - B_sat0_term;
-        M[1][1] = sats[2].coord.y / (sats[2].time) - B_sat0_term;
-        M[2][1] = sats[3].coord.y / (sats[3].time) - B_sat0_term;
-            
-        M[0][2] = sats[1].coord.z / (sats[1].time) - C_sat0_term;
-        M[1][2] = sats[2].coord.z / (sats[2].time) - C_sat0_term;
-        M[2][2] = sats[3].coord.z / (sats[3].time) - C_sat0_term;
+    // calculation of Ai, Bi, Ci constants involves division by a non constant, so we are 
+    // not trying operator strength reduction
+    M[0][0] = sats[1].coord.x / (sats[1].time) - A_sat0_term;
+    M[1][0] = sats[2].coord.x / (sats[2].time) - A_sat0_term;
+    M[2][0] = sats[3].coord.x / (sats[3].time) - A_sat0_term;
 
-        // optimization attempt: apply operator strength reduction by using shifts
-        int64_t denom_1 = (int64_t)(sats[1].time) << 1;
-        int64_t denom_2 = (int64_t)(sats[2].time) << 1;
-        int64_t denom_3 = (int64_t)(sats[3].time) << 1;
+    M[0][1] = sats[1].coord.y / (sats[1].time) - B_sat0_term;
+    M[1][1] = sats[2].coord.y / (sats[2].time) - B_sat0_term;
+    M[2][1] = sats[3].coord.y / (sats[3].time) - B_sat0_term;
+        
+    M[0][2] = sats[1].coord.z / (sats[1].time) - C_sat0_term;
+    M[1][2] = sats[2].coord.z / (sats[2].time) - C_sat0_term;
+    M[2][2] = sats[3].coord.z / (sats[3].time) - C_sat0_term;
 
-        // optimization attempt: use pre-calculated term 1 coeficient (TERM1_CONST)
-        int64_t D0_term1 = TERM1_CONST * ((int64_t)sats[1].time - sats[0].time);
-        int64_t D1_term1 = TERM1_CONST * ((int64_t)sats[2].time - sats[0].time);
-        int64_t D2_term1 = TERM1_CONST * ((int64_t)sats[3].time - sats[0].time);
+    // timestamp index 2
+    putTimestamp(timestamps, &timestamp_count);
 
-        // optimization attempt: remove 4 divisions in term 2 calculation by grouping x,y,z in single numerator.
-        // This will cut the precision of the numerator in 4 since we need to right shift 
-        // coordinates so that overflow doesnt occur, but this shouldnt be noticeable. Additionally, 
-        // we remove the division by FIXED_POINT_DISTANCE_FACTOR and apply operator strength 
-        // reduction by replacing it with a multiplication and right shift
-        int64_t D0_term2 =
-                D_sat0_term2 - ((
-                (((int64_t)sats[1].coord.x * sats[1].coord.x) >> 2) +
-                (((int64_t)sats[1].coord.y * sats[1].coord.y) >> 2) +
-                (((int64_t)sats[1].coord.z * sats[1].coord.z) >> 2))
-                / denom_1 );
+    // optimization attempt: apply operator strength reduction by using shifts
+    int64_t denom_1 = (int64_t)(sats[1].time) << 1;
+    int64_t denom_2 = (int64_t)(sats[2].time) << 1;
+    int64_t denom_3 = (int64_t)(sats[3].time) << 1;
 
-        int64_t D1_term2 =
-                D_sat0_term2 - ((
-                (((int64_t)sats[2].coord.x * sats[2].coord.x) >> 2) +
-                (((int64_t)sats[2].coord.y * sats[2].coord.y) >> 2) +
-                (((int64_t)sats[2].coord.z * sats[2].coord.z) >> 2))
-                / denom_2 );
+    // optimization attempt: use pre-calculated term 1 coeficient (TERM1_CONST)
+    int64_t D0_term1 = TERM1_CONST * ((int64_t)sats[1].time - sats[0].time);
+    int64_t D1_term1 = TERM1_CONST * ((int64_t)sats[2].time - sats[0].time);
+    int64_t D2_term1 = TERM1_CONST * ((int64_t)sats[3].time - sats[0].time);
 
-        int64_t D2_term2 =
-                D_sat0_term2 - ((
-                (((int64_t)sats[3].coord.x * sats[3].coord.x) >> 2) +
-                (((int64_t)sats[3].coord.y * sats[3].coord.y) >> 2) +
-                (((int64_t)sats[3].coord.z * sats[3].coord.z) >> 2))
-                / denom_3 );
+    // timestamp index 3
+    putTimestamp(timestamps, &timestamp_count);
+    // THIS IS THE BOTTLENECK: need to optimise term2 calculations
 
-        // compensate for shifting and removing division by FIXED_POINT_DISTANCE_FACTOR:
-        // we left shifted all the numerators in term 2 by 2 and removed a division by 106.
-        // essentially, we need to divide by 106/4 = 26.5. The numerators in the previous 
-        // step contain numbers that could fill the entire 64 bit range, and the denominators 
-        // contain numbers which should be at the very least 31,348 (15 bits). Therefore, we
-        // can safely multiply by a 14 bit number without causing overflow. our best option is 
-        // to multiply by 9892 (14 bits) then right shift by 18
+    // optimization attempt: remove 4 divisions in term 2 calculation by grouping x,y,z in single numerator.
+    // This will cut the precision of the numerator in 4 since we need to right shift 
+    // coordinates so that overflow doesnt occur, but this shouldnt be noticeable. Additionally, 
+    // we remove the division by FIXED_POINT_DISTANCE_FACTOR and apply operator strength 
+    // reduction by replacing it with a multiplication and right shift
+    
+    int64_t D_sat0_term2 = ((((int64_t)sats[0].coord.x * sats[0].coord.x) >> 2) +
+                            (((int64_t)sats[0].coord.y * sats[0].coord.y) >> 2) +
+                            (((int64_t)sats[0].coord.z * sats[0].coord.z) >> 2)) 
+                            / ((int64_t)(sats[0].time) << 1);
 
-        D0_term2 = (D0_term2 * 9892) >> 18;
-        D1_term2 = (D1_term2 * 9892) >> 18;
-        D2_term2 = (D2_term2 * 9892) >> 18;
+    int64_t D0_term2 =
+            D_sat0_term2 - ((
+            (((int64_t)sats[1].coord.x * sats[1].coord.x) >> 2) +
+            (((int64_t)sats[1].coord.y * sats[1].coord.y) >> 2) +
+            (((int64_t)sats[1].coord.z * sats[1].coord.z) >> 2))
+            / denom_1 );
 
-        augments[0] = D0_term1 + D0_term2;
-        augments[1] = D1_term1 + D1_term2;
-        augments[2] = D2_term1 + D2_term2;    
+    int64_t D1_term2 =
+            D_sat0_term2 - ((
+            (((int64_t)sats[2].coord.x * sats[2].coord.x) >> 2) +
+            (((int64_t)sats[2].coord.y * sats[2].coord.y) >> 2) +
+            (((int64_t)sats[2].coord.z * sats[2].coord.z) >> 2))
+            / denom_2 );
+
+    int64_t D2_term2 =
+            D_sat0_term2 - ((
+            (((int64_t)sats[3].coord.x * sats[3].coord.x) >> 2) +
+            (((int64_t)sats[3].coord.y * sats[3].coord.y) >> 2) +
+            (((int64_t)sats[3].coord.z * sats[3].coord.z) >> 2))
+            / denom_3 );
+
+    // timestamp index 4
+    putTimestamp(timestamps, &timestamp_count);
+
+    // compensate for shifting and removing division by FIXED_POINT_DISTANCE_FACTOR:
+    // we left shifted all the numerators in term 2 by 2 and removed a division by 106.
+    // essentially, we need to divide by 106/4 = 26.5. The numerators in the previous 
+    // step contain numbers that could fill the entire 64 bit range, and the denominators 
+    // contain numbers which should be at the very least 31,348 (15 bits). Therefore, we
+    // can safely multiply by a 14 bit number without causing overflow. our best option is 
+    // to multiply by 9892 (14 bits) then right shift by 18
+
+    D0_term2 = (D0_term2 * 9892) >> 18;
+    D1_term2 = (D1_term2 * 9892) >> 18;
+    D2_term2 = (D2_term2 * 9892) >> 18;
+
+    augments[0] = D0_term1 + D0_term2;
+    augments[1] = D1_term1 + D1_term2;
+    augments[2] = D2_term1 + D2_term2;    
+
+    // timestamp index 5
+    putTimestamp(timestamps, &timestamp_count);
 
     // printf("pre gaussian:\n");
     // int i,j;
@@ -124,7 +147,7 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     // }
 
     #ifdef PRM_BENCHMARKING
-        // timestamp index 1
+        // timestamp index 6
         clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
         timestamp_count++;
     #endif
@@ -178,7 +201,7 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     augments[1]  -= (ratio * augments[2])  >> 16;
 
     #ifdef PRM_BENCHMARKING
-        // timestamp index 2
+        // timestamp index 7
         clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
         timestamp_count++;
     #endif
@@ -198,7 +221,7 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     emitter_coords->z = -(int32_t)(augments[2] / M[2][2]);
 
     #ifdef PRM_BENCHMARKING
-        // timestamp index 3
+        // timestamp index 8
         clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
         timestamp_count++;
     #endif
@@ -216,7 +239,7 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
 
 
     #ifdef PRM_BENCHMARKING
-        // timestamp index 4
+        // timestamp index 9
         clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
         timestamp_count++;
     #endif
