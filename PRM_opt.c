@@ -1,6 +1,7 @@
 #include "PRM.h"
 #include "stdio.h"
 #include <time.h>
+#include <math.h>
 
 #define LIGHT_SPEED                 300000000
 #define FIXED_POINT_DISTANCE_FACTOR 106
@@ -8,27 +9,6 @@
 #define EARTH_RADIUS                6371000 
 #define PRM_NUM_TIMESTAMPS          64
 #define TERM1_CONST                 (int64_t)11106022
-
-double sqrt(double num) {
-    if (num < 0) {
-        // Square root of a negative number is undefined
-        return -1.0;
-    }
-
-    // Initial guess
-    double x = num;
-
-    // Newton-Raphson method to approximate the square root
-    const int iterations = 10; // You can adjust the number of iterations for better accuracy
-    int i;
-    for (i = 0; i < iterations; i++) {
-        x = 0.5 * (x + num / x);
-    }
-
-    return x;
-}
-
-
 
 void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps){
 
@@ -224,8 +204,7 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     #endif
 
     // Scale the emmitter coords to a point on the surface of the earth
-    int64_t multiplier = sqrt( 
-        (int64_t)EARTH_RADIUS * EARTH_RADIUS * 106 * 106 /
+    double multiplier = EARTH_RADIUS * 106 / sqrt( 
         ((int64_t)emitter_coords->x * emitter_coords->x +
         (int64_t)emitter_coords->y * emitter_coords->y +
         (int64_t)emitter_coords->z * emitter_coords->z)
