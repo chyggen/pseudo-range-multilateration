@@ -28,6 +28,14 @@ int64_t calcDiTerm2(GPS_data_t* sat_i, int64_t D_sat0_term2)
             (((int64_t)sat_i->coord.z * sat_i->coord.z) >> 2))
             / ((int64_t)(sat_i->time) << 1) ;
 
+    // compensate for shifting and removing division by FIXED_POINT_DISTANCE_FACTOR:
+    // we left shifted all the numerators in term 2 by 2 and removed a division by 106.
+    // essentially, we need to divide by 106/4 = 26.5. The numerators in the previous 
+    // step contain numbers that could fill the entire 64 bit range, and the denominators 
+    // contain numbers which should be at the very least 31,348 (15 bits). Therefore, we
+    // can safely multiply by a 14 bit number without causing overflow. our best option is 
+    // to multiply by 9892 (14 bits) then right shift by 18
+
     return (int64_t)(D0_term2 * 9892) >> 18;
 }
 
@@ -98,14 +106,6 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
                             (((int64_t)sats[0].coord.z * sats[0].coord.z) >> 2)) 
                             / ((int64_t)(sats[0].time) << 1);
 
-    // compensate for shifting and removing division by FIXED_POINT_DISTANCE_FACTOR:
-    // we left shifted all the numerators in term 2 by 2 and removed a division by 106.
-    // essentially, we need to divide by 106/4 = 26.5. The numerators in the previous 
-    // step contain numbers that could fill the entire 64 bit range, and the denominators 
-    // contain numbers which should be at the very least 31,348 (15 bits). Therefore, we
-    // can safely multiply by a 14 bit number without causing overflow. our best option is 
-    // to multiply by 9892 (14 bits) then right shift by 18
-
     int64_t D0_term2 = calcDiTerm2(&sats[1], D_sat0_term2);
     int64_t D1_term2 = calcDiTerm2(&sats[2], D_sat0_term2);
     int64_t D2_term2 = calcDiTerm2(&sats[3], D_sat0_term2);
@@ -131,12 +131,6 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     //     }
     //     printf("%20ld\n", augments[i]);
     // }
-
-    #ifdef PRM_BENCHMARKING
-        // timestamp index 6
-        clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
-        timestamp_count++;
-    #endif
 
     // STAGE 2: gaussian elimination 
 
@@ -186,11 +180,9 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     ratio = ((int64_t)M[1][2] << 16) / M[2][2];
     augments[1]  -= (ratio * augments[2])  >> 16;
 
-    #ifdef PRM_BENCHMARKING
-        // timestamp index 7
-        clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
-        timestamp_count++;
-    #endif
+
+    // timestamp index 6
+    putTimestamp(timestamps, &timestamp_count);
 
     /*printf("post gaussian:\n");
     for (i = 0; i < 3; ++i)
@@ -202,18 +194,16 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
         printf("%20ld\n", augments[i]);
     }*/
 
+    // STAGE 3: calculate and scale coordinates 
     emitter_coords->x = -(int32_t)(augments[0] / M[0][0]); 
     emitter_coords->y = -(int32_t)(augments[1] / M[1][1]);
     emitter_coords->z = -(int32_t)(augments[2] / M[2][2]);
 
-    #ifdef PRM_BENCHMARKING
-        // timestamp index 8
-        clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
-        timestamp_count++;
-    #endif
+    // timestamp index 7
+    putTimestamp(timestamps, &timestamp_count);
 
     // Scale the emmitter coords to a point on the surface of the earth
-    double multiplier = EARTH_RADIUS * 106 / sqrt( 
+    double multiplier = EARTH_RADIUS * FIXED_POINT_DISTANCE_FACTOR / sqrt( 
         ((int64_t)emitter_coords->x * emitter_coords->x +
         (int64_t)emitter_coords->y * emitter_coords->y +
         (int64_t)emitter_coords->z * emitter_coords->z)
@@ -223,11 +213,8 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     emitter_coords->y = (int32_t)(emitter_coords->y * multiplier);
     emitter_coords->z = (int32_t)(emitter_coords->z * multiplier);
 
+    // timestamp index 8
+    putTimestamp(timestamps, &timestamp_count);
 
-    #ifdef PRM_BENCHMARKING
-        // timestamp index 9
-        clock_gettime(CLOCK_MONOTONIC, timestamps + timestamp_count);
-        timestamp_count++;
-    #endif
 }
 
