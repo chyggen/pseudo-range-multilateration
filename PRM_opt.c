@@ -19,6 +19,18 @@ void putTimestamp(struct timespec* timestamps, int* timestamp_count )
     #endif
 }
 
+int64_t calcDiTerm2(GPS_data_t* sat_i, int64_t D_sat0_term2)
+{
+    int64_t D0_term2 =
+            D_sat0_term2 - (
+            (((int64_t)sat_i->coord.x * sat_i->coord.x) >> 2) +
+            (((int64_t)sat_i->coord.y * sat_i->coord.y) >> 2) +
+            (((int64_t)sat_i->coord.z * sat_i->coord.z) >> 2))
+            / ((int64_t)(sat_i->time) << 1) ;
+
+    return (int64_t)(D0_term2 * 9892) >> 18;
+}
+
 void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps){
 
     /*  Goal: want to apply scale factors to Ai, Bi, Ci, Di constants to not lose precision througout.
@@ -66,11 +78,6 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     // timestamp index 2
     putTimestamp(timestamps, &timestamp_count);
 
-    // optimization attempt: apply operator strength reduction by using shifts
-    int64_t denom_1 = (int64_t)(sats[1].time) << 1;
-    int64_t denom_2 = (int64_t)(sats[2].time) << 1;
-    int64_t denom_3 = (int64_t)(sats[3].time) << 1;
-
     // optimization attempt: use pre-calculated term 1 coeficient (TERM1_CONST)
     int64_t D0_term1 = TERM1_CONST * ((int64_t)sats[1].time - sats[0].time);
     int64_t D1_term1 = TERM1_CONST * ((int64_t)sats[2].time - sats[0].time);
@@ -91,30 +98,6 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
                             (((int64_t)sats[0].coord.z * sats[0].coord.z) >> 2)) 
                             / ((int64_t)(sats[0].time) << 1);
 
-    int64_t D0_term2 =
-            D_sat0_term2 - ((
-            (((int64_t)sats[1].coord.x * sats[1].coord.x) >> 2) +
-            (((int64_t)sats[1].coord.y * sats[1].coord.y) >> 2) +
-            (((int64_t)sats[1].coord.z * sats[1].coord.z) >> 2))
-            / denom_1 );
-
-    int64_t D1_term2 =
-            D_sat0_term2 - ((
-            (((int64_t)sats[2].coord.x * sats[2].coord.x) >> 2) +
-            (((int64_t)sats[2].coord.y * sats[2].coord.y) >> 2) +
-            (((int64_t)sats[2].coord.z * sats[2].coord.z) >> 2))
-            / denom_2 );
-
-    int64_t D2_term2 =
-            D_sat0_term2 - ((
-            (((int64_t)sats[3].coord.x * sats[3].coord.x) >> 2) +
-            (((int64_t)sats[3].coord.y * sats[3].coord.y) >> 2) +
-            (((int64_t)sats[3].coord.z * sats[3].coord.z) >> 2))
-            / denom_3 );
-
-    // timestamp index 4
-    putTimestamp(timestamps, &timestamp_count);
-
     // compensate for shifting and removing division by FIXED_POINT_DISTANCE_FACTOR:
     // we left shifted all the numerators in term 2 by 2 and removed a division by 106.
     // essentially, we need to divide by 106/4 = 26.5. The numerators in the previous 
@@ -123,9 +106,12 @@ void PRM(coord_t* emitter_coords, GPS_data_t* sats, struct timespec* timestamps)
     // can safely multiply by a 14 bit number without causing overflow. our best option is 
     // to multiply by 9892 (14 bits) then right shift by 18
 
-    D0_term2 = (D0_term2 * 9892) >> 18;
-    D1_term2 = (D1_term2 * 9892) >> 18;
-    D2_term2 = (D2_term2 * 9892) >> 18;
+    int64_t D0_term2 = calcDiTerm2(&sats[1], D_sat0_term2);
+    int64_t D1_term2 = calcDiTerm2(&sats[2], D_sat0_term2);
+    int64_t D2_term2 = calcDiTerm2(&sats[3], D_sat0_term2);
+
+    // timestamp index 4
+    putTimestamp(timestamps, &timestamp_count);
 
     augments[0] = D0_term1 + D0_term2;
     augments[1] = D1_term1 + D1_term2;
